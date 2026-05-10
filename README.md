@@ -1,59 +1,57 @@
-# QMK Userspace
+# QMK Userspace — Miryoku on Ferris Sweep
 
-This is a template repository which allows for an external set of QMK keymaps to be defined and compiled. This is useful for users who want to maintain their own keymaps without having to fork the [main QMK repository](https://github.com/qmk/qmk_firmware). You must still fork the main QMK repository if writing firmware for a *new* keyboard.
+[Miryoku](https://github.com/manna-harbour/miryoku) layout for the [Ferris Sweep](https://github.com/davidphilipbarr/Sweep) split keyboard, running on the [Blok](https://boardsource.xyz/products/blok-rp2040-keyboard-controller) (RP2040) controller.
 
-## Howto configure your build targets
+## Hardware
 
-1. Run the normal `qmk setup` procedure if you haven't already done so -- see [QMK Docs](https://docs.qmk.fm/#/newbs) for details.
-1. Fork this repository
-1. Clone your fork to your local machine
-1. Enable userspace in QMK config using `qmk config user.overlay_dir="$(realpath qmk_userspace)"`
-1. Add a new keymap for your board using `qmk new-keymap`
-    * This will create a new keymap in the `keyboards` directory, in the same location that would normally be used in the main QMK repository. For example, if you wanted to add a keymap for the Planck, it will be created in `keyboards/planck/keymaps/<your keymap name>`
-    * You can also create a new keymap using `qmk new-keymap -kb <your_keyboard> -km <your_keymap>`
-    * Alternatively, add your keymap manually by placing it in the location specified above.
-    * `layouts/<layout name>/<your keymap name>/keymap.*` is also supported if you prefer the layout system
-1. Add your keymap(s) to the build by running `qmk userspace-add -kb <your_keyboard> -km <your_keymap>`
-    * This will automatically update your `qmk.json` file
-    * Corresponding `qmk userspace-remove -kb <your_keyboard> -km <your_keymap>` will delete it
-    * Listing the build targets can be done with `qmk userspace-list`
-1. Commit your changes
+- **Keyboard:** Ferris Sweep — 34-key (3×5 + 2 thumbs) wireless-ready split
+- **Controller:** Blok (RP2040), one per half
 
-## Howto build with GitHub
+## Layout
 
-1. In the GitHub Actions tab, enable workflows
-1. Push your changes above to your forked GitHub repository
-1. Look at the GitHub Actions for a new actions run
-1. Wait for the actions run to complete
-1. Inspect the Releases tab on your repository for the latest firmware build
+[Miryoku](https://github.com/manna-harbour/miryoku) is a 34-key layout built around 10 layers: base alpha, navigation, mouse, media, numbers, symbols, function keys, and more. Layers are accessed via the six thumb keys using hold-tap (home row mods + thumb holds).
 
-## Howto build locally
+See the [Miryoku reference card](https://github.com/manna-harbour/miryoku/tree/master/docs/reference) for the full layer map.
 
-1. Run the normal `qmk setup` procedure if you haven't already done so -- see [QMK Docs](https://docs.qmk.fm/#/newbs) for details.
-1. Fork this repository
-1. Clone your fork to your local machine
-1. `cd` into this repository's clone directory
-1. Set global userspace path: `qmk config user.overlay_dir="$(realpath .)"` -- you MUST be located in the cloned userspace location for this to work correctly
-    * This will be automatically detected if you've `cd`ed into your userspace repository, but the above makes your userspace available regardless of your shell location.
-1. Compile normally: `qmk compile -kb your_keyboard -km your_keymap` or `make your_keyboard:your_keymap`
+## Prerequisites
 
-Alternatively, if you configured your build targets above, you can use `qmk userspace-compile` to build all of your userspace targets at once.
+Enter the Nix devshell — it installs QMK, the ARM toolchain, and flashing tools, and automatically configures `qmk_home` and the userspace path:
 
-## Extra info
-
-If you wish to point GitHub actions to a different repository, a different branch, or even a different keymap name, you can modify `.github/workflows/build_binaries.yml` to suit your needs.
-
-To override the `build` job, you can change the following parameters to use a different QMK repository or branch:
-```
-    with:
-      qmk_repo: qmk/qmk_firmware
-      qmk_ref: master
+```sh
+nix develop
 ```
 
-If you wish to manually manage `qmk_firmware` using git within the userspace repository, you can add `qmk_firmware` as a submodule in the userspace directory instead. GitHub Actions will automatically use the submodule at the pinned revision if it exists, otherwise it will use the default latest revision of `qmk_firmware` from the main repository.
+The devshell also initializes the `qmk_firmware` submodule on first run if it is not already present.
 
-This can also be used to control which fork is used, though only upstream `qmk_firmware` will have support for external userspace until other manufacturers update their forks.
+## Flashing
 
-1. (First time only) `git submodule add https://github.com/qmk/qmk_firmware.git`
-1. (To update) `git submodule update --init --recursive`
-1. Commit your changes to your userspace repository
+> **Why these specific commands?**
+> This firmware uses `EE_HANDS` to detect which half is left and which is right. Unlike other handedness methods, `EE_HANDS` stores the side in each half's EEPROM. This information is written during flashing via the `-bl uf2-split-left` / `-bl uf2-split-right` bootloader flag. Dragging and dropping a `.uf2` file directly skips this step and leaves both halves with no handedness configured.
+
+### Step 1 — Enter bootloader mode
+
+Double-click the reset button on the half you want to flash. The half will appear as a USB mass-storage device (e.g. `RPI-RP2`).
+
+### Step 2 — Flash
+
+Flash each half separately. Run the appropriate command below, then repeat for the other half.
+
+**Left half:**
+```sh
+qmk flash -kb ferris/sweep -km miryoku -e CONVERT_TO=blok -bl uf2-split-left
+```
+
+**Right half:**
+```sh
+qmk flash -kb ferris/sweep -km miryoku -e CONVERT_TO=blok -bl uf2-split-right
+```
+
+Both halves must be flashed at least once so that their EEPROM contains the correct side information. After that, only reflash both halves when updating firmware.
+
+## Building (optional)
+
+To compile without flashing — useful to verify the firmware builds cleanly:
+
+```sh
+qmk userspace-compile
+```
